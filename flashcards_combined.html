@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Flashcards App — Combined</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            padding: 40px;
+            display: flex;
+            justify-content: center;
+            transition: background .3s, color .3s;
+        }
+
+        body.dark {
+            background: #1e1e1e;
+            color: #eee;
+        }
+
+        #app {
+            width: 700px;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            background: #ddd;
+            border-radius: 8px 8px 0 0;
+            font-weight: bold;
+            transition: .2s;
+        }
+        .tab.active {
+            background: #fff;
+            border-bottom: 2px solid #007bff;
+        }
+        body.dark .tab {
+            background: #333;
+        }
+        body.dark .tab.active {
+            background: #222;
+        }
+
+        .card {
+            background: #fff;
+            padding: 30px;
+            border-radius: 0 0 12px 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,.1);
+            min-height: 260px;
+            transition: background .3s;
+            text-align: center;
+        }
+        body.dark .card {
+            background: #2c2c2c;
+        }
+
+        .content {
+            font-size: 22px;
+            min-height: 120px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            border: none;
+        }
+
+        #toggleMode { background: #ff9800; color: white; float: right; }
+
+        .btn-primary { background: #007bff; color: white; }
+        .btn-next { background: #28a745; color: white; }
+        .btn-prev { background: #6c757d; color: white; }
+
+    </style>
+</head>
+<body>
+
+<div id="app">
+
+    <button id="toggleMode">Toggle Dark Mode</button>
+
+    <div class="tabs">
+        <div class="tab active" id="tabQ">Question First</div>
+        <div class="tab" id="tabA">Answer First</div>
+    </div>
+
+    <!-- CARD CONTAINER -->
+    <div class="card">
+        <div id="counter"></div>
+        <div id="content1" class="content"></div>
+        <div id="content2" class="content" style="display:none;"></div>
+
+        <button id="toggleBtn" class="btn-primary"></button><br>
+        <button id="prevBtn" class="btn-prev">Previous</button>
+        <button id="nextBtn" class="btn-next">Next</button>
+    </div>
+</div>
+
+<script>
+
+    // =========================================================
+    // FLASHCARD DATA
+    // =========================================================
+
+    // Original Q → A array
+    const qaCards = [
+        {q:"What is the purpose of AWS IAM?", a:"To control who can do what in your AWS account using users, groups, roles, and policies."},
+        {q:"What are IAM users and groups used for?", a:"They are used for human access."},
+        {q:"What are IAM roles used for?", a:"Temporary access for AWS services, federated users, and cross-account access."},
+        {q:"What are IAM policies?", a:"JSON documents that define allow/deny permissions."},
+        {q:"Memory trick for IAM?", a:"IAM = identities + rules."},
+
+        {q:"What is AWS Organizations used for?", a:"Multi-account management with centralized governance and billing."},
+        {q:"What is an SCP?", a:"Service Control Policy — restricts what accounts can do, even root."},
+        {q:"What is an OU?", a:"Organizational Unit that groups accounts for shared policies."},
+        {q:"Memory trick for AWS Organizations?", a:"Accounts + guardrails."},
+
+        {q:"What is a VPC?", a:"Your isolated, private network inside AWS."},
+        {q:"What defines routing in a VPC?", a:"Route tables, IGW, NAT, SGs, NACLs."},
+        {q:"Purpose of a NAT Gateway?", a:"Outbound-only internet access for private subnets."},
+        {q:"Memory trick for VPC?", a:"Your own data center in AWS."},
+
+        {q:"What does AWS WAF protect against?", a:"SQL injection, XSS, bots, and bad IP addresses."},
+        {q:"Where can AWS WAF be applied?", a:"CloudFront, ALB, API Gateway."},
+        {q:"Memory trick for WAF?", a:"Shield for web apps."},
+
+        {q:"What is Site-to-Site VPN?", a:"Encrypted IPsec tunnel between on-premises and AWS."},
+        {q:"What is required for VPN on AWS?", a:"Virtual Private Gateway (VGW)."},
+        {q:"Memory trick for VPN?", a:"Encrypted tunnel to AWS."},
+
+        {q:"What is AWS PrivateLink?", a:"Private access to AWS services without using the internet."},
+        {q:"Memory trick for PrivateLink?", a:"Private door to AWS services."},
+
+        {q:"What does AWS STS provide?", a:"Temporary security credentials."},
+        {q:"Why use STS?", a:"Improves security by issuing short-lived credentials."},
+        {q:"Memory trick for STS?", a:"Temporary keys on demand."},
+
+        {q:"What are resource policies?", a:"Policies attached directly to resources like S3, SNS, SQS, Lambda."},
+        {q:"Identity vs Resource policy?", a:"Identity = what the user can do; Resource = who can access the resource."},
+
+        // IAM Best Practices
+        {q:"Root user best practice?", a:"Enable MFA, delete access keys, rarely use root."},
+        {q:"IAM user best practice?", a:"Use least privilege, groups, and roles instead of keys."},
+
+        // RBAC
+        {q:"What is RBAC?", a:"Role-based access control based on job functions."},
+
+        // Federation
+        {q:"What is federation?", a:"External identity providers authenticate users who assume IAM roles."},
+
+        // CloudTrail
+        {q:"What does CloudTrail capture?", a:"API calls and account events."},
+        {q:"What is an Organization Trail?", a:"CloudTrail that logs all accounts in AWS Organizations."},
+
+        // CloudWatch
+        {q:"What does CloudWatch monitor?", a:"Metrics, logs, alarms, and events."},
+
+        // Control Tower
+        {q:"What is AWS Control Tower?", a:"Automated multi-account setup with guardrails."},
+
+        // SCPs
+        {q:"What do SCPs do?", a:"Set max permissions for accounts; override even root."},
+
+        // AWS Config
+        {q:"What does AWS Config do?", a:"Tracks resource configuration & evaluates compliance."},
+
+        // EventBridge
+        {q:"What is EventBridge?", a:"Event bus that routes events and triggers automation."},
+
+        // VPC Security
+        {q:"What are Security Groups?", a:"Stateful firewalls with allow-only rules."},
+        {q:"What are NACLs?", a:"Stateless firewalls with allow+deny rules."},
+        {q:"When use NACLs?", a:"To block specific IP ranges."},
+
+        // IGW vs NAT
+        {q:"What is an Internet Gateway?", a:"Enables public inbound/outbound traffic."},
+        {q:"What is a NAT Gateway?", a:"Outbound-only internet for private subnets."},
+
+        // Peering & Direct Connect
+        {q:"Does VPC peering support transitive routing?", a:"No."},
+        {q:"What is Direct Connect?", a:"Dedicated private connection from on-prem to AWS."},
+
+        // Shield, Macie, GuardDuty, Secrets Manager
+        {q:"What is AWS Shield Standard?", a:"Free DDoS protection."},
+        {q:"What is AWS Shield Advanced?", a:"Paid DDoS protection with 24/7 support and cost protection."},
+        {q:"What is Macie?", a:"Sensitive data discovery in S3 using ML."},
+        {q:"What is GuardDuty?", a:"Threat detection using ML and anomaly detection."},
+        {q:"What is Secrets Manager?", a:"Secure storage and rotation of secrets."},
+        {q:"What is Cognito?", a:"User authentication and identity for apps."},
+
+        // Encryption
+        {q:"Difference between symmetric and asymmetric encryption?", a:"Symmetric = same key; Asymmetric = public/private pair."},
+
+        {q:"What is AWS KMS?", a:"Managed key service integrated with AWS services."},
+        {q:"What is CloudHSM?", a:"Customer-controlled hardware security module."},
+
+        // S3 Encryption
+        {q:"What is SSE-S3?", a:"Server-side encryption with S3-managed keys."},
+        {q:"What is SSE-KMS?", a:"Server-side encryption using KMS."},
+        {q:"What is SSE-C?", a:"Server-side encryption with customer-provided keys."},
+
+        // IAM Eval
+        {q:"What overrides everything in AWS permissions?", a:"Explicit Deny."},
+        {q:"What is default for all permissions?", a:"Implicit Deny."},
+
+        // S3 Lifecycle
+        {q:"When use S3 Lifecycle?", a:"Predictable data lifecycle."},
+        {q:"When use Intelligent-Tiering?", a:"Unpredictable access patterns."},
+
+        // DR Strategies
+        {q:"What is Backup & Restore DR?", a:"Lowest cost, highest recovery time."},
+        {q:"What is Multi-Site DR?", a:"Active-active lowest RTO."}
+    ];
+
+    // Create ANSWER FIRST array
+    const answerFirst = qaCards.map(card => ({
+        a: card.a,
+        q: card.q
+    }));
+
+    // =========================================================
+    // APP LOGIC
+    // =========================================================
+
+    let index = 0;
+    let mode = "Q";  // Q = Question First, A = Answer First
+
+    // DOM elements
+    const tabQ = document.getElementById("tabQ");
+    const tabA = document.getElementById("tabA");
+    const content1 = document.getElementById("content1");
+    const content2 = document.getElementById("content2");
+    const toggleBtn = document.getElementById("toggleBtn");
+    const counter = document.getElementById("counter");
+
+    function renderCard() {
+        counter.innerText = `Card ${index+1} of ${qaCards.length}`;
+
+        if (mode === "Q") {
+            content1.innerText = qaCards[index].q;
+            content2.innerText = qaCards[index].a;
+            toggleBtn.innerText = "Show Answer";
+        } else {
+            content1.innerText = answerFirst[index].a;
+            content2.innerText = answerFirst[index].q;
+            toggleBtn.innerText = "Show Question";
+        }
+
+        content2.style.display = "none";
+    }
+
+    // Toggle answer/question
+    toggleBtn.onclick = () => {
+        content2.style.display = content2.style.display === "none" ? "block" : "none";
+    };
+
+    // Next / Previous
+    document.getElementById("nextBtn").onclick = () => {
+        index = (index + 1) % qaCards.length;
+        renderCard();
+    };
+    document.getElementById("prevBtn").onclick = () => {
+        index = (index - 1 + qaCards.length) % qaCards.length;
+        renderCard();
+    };
+
+    // Switch tabs
+    tabQ.onclick = () => {
+        mode = "Q";
+        tabQ.classList.add("active");
+        tabA.classList.remove("active");
+        renderCard();
+    };
+
+    tabA.onclick = () => {
+        mode = "A";
+        tabA.classList.add("active");
+        tabQ.classList.remove("active");
+        renderCard();
+    };
+
+    // Dark mode
+    document.getElementById("toggleMode").onclick = () => {
+        document.body.classList.toggle("dark");
+    };
+
+    renderCard();
+
+</script>
+</body>
+</html>
